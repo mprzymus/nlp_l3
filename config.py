@@ -21,4 +21,7 @@ KOCON_CBOW = MODELS_DIR / "kgr10.plain.cbow.dim300.neg10.bin"
 PROBLEM_TRAIN = OUTPUTS_DIR / "problem_train.csv"
 PROBLEM_TEST = OUTPUTS_DIR / "problem_test.csv"
 
+ENGLISH_TRAIN = OUTPUTS_DIR / "english_train.csv"
+ENGLISH_TEST = OUTPUTS_DIR / "english_test.csv"
+
 CONTENT_LINK_REGEX = re.compile(r"https?://t.co/[a-zA-Z0-9]+")
