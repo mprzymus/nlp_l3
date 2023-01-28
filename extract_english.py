@@ -65,10 +65,6 @@ def main() -> None:
         ENGLISH_TEST,
     )
 
-    # for subset in dataset:
-    #     out = ENGLISH_TRAIN if subset == "train" else ENGLISH_TEST
-    #     extract(dataset.data[subset], out)  # type: ignore
-
 
 if __name__ == "__main__":
     main()
