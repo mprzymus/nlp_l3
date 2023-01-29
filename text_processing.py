@@ -3,6 +3,7 @@ import typing as t
 
 import emoji
 import nltk
+import torch
 from nltk.tokenize import casual_tokenize, sent_tokenize
 
 nltk.download("punkt", quiet=True)
@@ -33,3 +34,9 @@ def clean_to_sentences(
 
         if out_sent:
             yield out_sent
+
+
+def get_fasttext_embeddings(model, sentences: list[str]) -> torch.Tensor:
+    return torch.stack(
+        [torch.from_numpy(model.get_sentence_vector(sent)) for sent in sentences]
+    )

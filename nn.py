@@ -17,7 +17,7 @@ class LightningModel(pl.LightningModule):
     def __init__(
         self,
         learning_rate: float = 1e-3,
-        loss_cls=nn.BCELoss,
+        loss_cls=nn.BCEWithLogitsLoss,
     ) -> None:
         super().__init__()
 
@@ -85,7 +85,7 @@ class BinaryMLP(LightningModel):
         emb_dim: int,
         hidden_dims: list[int],
         learning_rate: float = 1e-3,
-        loss_cls=nn.BCELoss,
+        loss_cls=nn.BCEWithLogitsLoss,
     ) -> None:
         super().__init__(learning_rate=learning_rate, loss_cls=loss_cls)
 
@@ -93,6 +93,7 @@ class BinaryMLP(LightningModel):
             nn.Linear(emb_dim, hidden_dims[0]),
             nn.ReLU(inplace=True),
             nn.BatchNorm1d(hidden_dims[0]),
+            nn.Dropout(0.3),
             *(
                 layer
                 for i in range(len(hidden_dims) - 1)
@@ -103,7 +104,6 @@ class BinaryMLP(LightningModel):
                 )
             ),
             nn.Linear(hidden_dims[-1], 1),
-            nn.Sigmoid(),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -131,7 +131,7 @@ class CNNModel(LightningModel):
         head_dim: int = 128,
         sentence_length: int = 32,
         learning_rate: float = 1e-3,
-        loss_cls=nn.BCELoss,
+        loss_cls=nn.BCEWithLogitsLoss,
     ) -> None:
         super().__init__(learning_rate, loss_cls)
 
@@ -150,7 +150,6 @@ class CNNModel(LightningModel):
             nn.ReLU(inplace=True),
             nn.BatchNorm1d(head_dim),
             nn.Linear(head_dim, 1),
-            nn.Sigmoid(),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

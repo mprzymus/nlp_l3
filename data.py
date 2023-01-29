@@ -21,9 +21,7 @@ class TextDataset(Dataset):
         super().__init__()
         df = pd.read_csv(csv_file)
 
-        self.embeddings = torch.tensor(
-            [get_text_embedding(text) for text in df["text"]]
-        )
+        self.embeddings = get_text_embedding(df["text"].to_list())
         self.labels = torch.tensor(df["label"].values)
 
     def __len__(self) -> int:
