@@ -3,16 +3,23 @@ import typing as t
 
 import emoji
 import nltk
+import torch
 from nltk.tokenize import casual_tokenize, sent_tokenize
 
 nltk.download("punkt", quiet=True)
-TRANSITION_TABLE = str.maketrans("", "", string.punctuation + "—ᴗ❛… ️³￣’”„𓆉•♡›«»–")
+TRANSITION_TABLE = str.maketrans(
+    "", "", string.punctuation + r"—ᴗ❛… ️³￣’”„𓆉•♡›«»–‘“¦â˜´ðÿ‡​¹¸žïž‹‚¬·"
+)
 
 
-def clean_to_sentences(text: str, user_handle: str = "@user") -> t.Iterator[str]:
+def clean_to_sentences(
+    text: str,
+    user_handle: str = "@user",
+    language="polish",
+) -> t.Iterator[str]:
     text = text.replace(user_handle, "").lower()
 
-    sentences = sent_tokenize(text, language="polish")
+    sentences = sent_tokenize(text, language=language)
     for sent in sentences:
         words = [
             word.translate(TRANSITION_TABLE)
@@ -27,3 +34,9 @@ def clean_to_sentences(text: str, user_handle: str = "@user") -> t.Iterator[str]
 
         if out_sent:
             yield out_sent
+
+
+def get_fasttext_embeddings(model, sentences: list[str]) -> torch.Tensor:
+    return torch.stack(
+        [torch.from_numpy(model.get_sentence_vector(sent)) for sent in sentences]
+    )

@@ -17,7 +17,7 @@ class LightningModel(pl.LightningModule):
     def __init__(
         self,
         learning_rate: float = 1e-3,
-        loss_cls=nn.BCELoss,
+        loss_cls=nn.BCEWithLogitsLoss,
     ) -> None:
         super().__init__()
 
@@ -85,7 +85,7 @@ class BinaryMLP(LightningModel):
         emb_dim: int,
         hidden_dims: list[int],
         learning_rate: float = 1e-3,
-        loss_cls=nn.BCELoss,
+        loss_cls=nn.BCEWithLogitsLoss,
     ) -> None:
         super().__init__(learning_rate=learning_rate, loss_cls=loss_cls)
 
@@ -93,6 +93,7 @@ class BinaryMLP(LightningModel):
             nn.Linear(emb_dim, hidden_dims[0]),
             nn.ReLU(inplace=True),
             nn.BatchNorm1d(hidden_dims[0]),
+            nn.Dropout(0.3),
             *(
                 layer
                 for i in range(len(hidden_dims) - 1)
@@ -103,7 +104,6 @@ class BinaryMLP(LightningModel):
                 )
             ),
             nn.Linear(hidden_dims[-1], 1),
-            nn.Sigmoid(),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -152,13 +152,41 @@ class RNNModel(LightningModel):
 class CNNModel(LightningModel):
     def __init__(
         self,
+        emb_dim: int = 300,
+        conv_kernels: list[int] = [3, 4, 5],
+        conv_filter: int = 100,
+        head_dim: int = 128,
+        sentence_length: int = 32,
         learning_rate: float = 1e-3,
-        loss_cls=nn.BCELoss,
+        loss_cls=nn.BCEWithLogitsLoss,
     ) -> None:
         super().__init__(learning_rate, loss_cls)
 
+        self.convs = nn.ModuleList(
+            nn.Sequential(
+                nn.Conv2d(1, conv_filter, (kernel, emb_dim)),
+                nn.ReLU(inplace=True),
+                nn.MaxPool2d((sentence_length - kernel + 1, 1)),
+            )
+            for kernel in conv_kernels
+        )
+
+        self.head = nn.Sequential(
+            nn.Dropout(0.2),
+            nn.Linear(conv_filter * len(conv_kernels), head_dim),
+            nn.ReLU(inplace=True),
+            nn.BatchNorm1d(head_dim),
+            nn.Linear(head_dim, 1),
+        )
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        pass
+        x = x.unsqueeze(1)
+
+        out_convs = [conv(x) for conv in self.convs]
+        out = torch.cat(out_convs, dim=1).squeeze()
+        out = self.head(out).squeeze()
+
+        return out
 
 
 class MetricTracker(Callback):
