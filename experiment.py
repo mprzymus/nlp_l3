@@ -7,8 +7,47 @@ from herbert import calc_text_embedding
 
 import pytorch_lightning as pl
 
-from data import HatefulTweets, TransformerEmbeddingsDataset
-from nn import BinaryMLP, train_model
+from data import HatefulTweets, RnnDataset, TransformerEmbeddingsDataset
+from nn import BinaryMLP, LSTMModel, RNNModel, train_model
+
+
+def run_lstm_test(
+    model_file: Path,
+    name: str = "model",
+    seed: int = 42,
+    verbose: bool = True,
+    feature_size=300, hidden_size=150, num_layers=1
+) -> dict[str, float]:
+    pl.seed_everything(seed, workers=True)
+
+    datamodule = HatefulTweets(
+        model_file, 128, dataset_cls=RnnDataset
+    )
+    model = LSTMModel(feature_size=feature_size, hidden_size=hidden_size,
+                      num_layers=num_layers, learning_rate=1e-4)
+
+    best_log = train_model(model, datamodule, name=name,
+                           epochs=200, verbose=verbose)
+    return best_log
+
+def run_rnn_test(
+    model_file: Path,
+    name: str = "model",
+    seed: int = 42,
+    verbose: bool = True,
+    feature_size=300, hidden_size=150, num_layers=1
+) -> dict[str, float]:
+    pl.seed_everything(seed, workers=True)
+
+    datamodule = HatefulTweets(
+        model_file, 128, dataset_cls=RnnDataset
+    )
+    model = RNNModel(feature_size=feature_size, hidden_size=hidden_size,
+                      num_layers=num_layers, learning_rate=1e-4)
+
+    best_log = train_model(model, datamodule, name=name,
+                           epochs=200, verbose=verbose)
+    return best_log
 
 
 def run_transformer_test(
@@ -23,7 +62,8 @@ def run_transformer_test(
     )
     model = BinaryMLP(768, [512, 256, 128, 64], learning_rate=1e-4)
 
-    best_log = train_model(model, datamodule, name=name, epochs=3, verbose=verbose)
+    best_log = train_model(model, datamodule, name=name,
+                           epochs=200, verbose=verbose)
     return best_log
 
 
@@ -38,7 +78,8 @@ def run_fasttext_test(
     datamodule = HatefulTweets(model_file, 128)
     model = BinaryMLP(300, [512, 256, 128, 64], learning_rate=1e-4)
 
-    best_log = train_model(model, datamodule, name=name, epochs=200, verbose=verbose)
+    best_log = train_model(model, datamodule, name=name,
+                           epochs=200, verbose=verbose)
     return best_log
 
 
@@ -72,6 +113,36 @@ def run_repeated_fasttext(
         lambda seed: run_fasttext_test(
             name=f"{name}_{seed}", seed=seed, verbose=verbose, model_file=model_file
         )
+    )
+
+
+def run_repeated_lstm(
+    model_file: Path,
+    name: str = "lstm",
+    verbose: bool = False,
+    seed_start=1,
+    seed_end=11,
+    feature_size=300, hidden_size=150, num_layers=1
+) -> dict[str, str]:
+    return run_repeated(
+        lambda seed: run_lstm_test(
+            name=f"{name}_{seed}", seed=seed, verbose=verbose, model_file=model_file, feature_size=feature_size, hidden_size=hidden_size, num_layers=num_layers),
+        seed_start=seed_start, seed_end=seed_end
+    )
+
+
+def run_repeated_rnn(
+    model_file: Path,
+    name: str = "lstm",
+    verbose: bool = False,
+    seed_start=1,
+    seed_end=11,
+    feature_size=300, hidden_size=150, num_layers=1
+) -> dict[str, str]:
+    return run_repeated(
+        lambda seed: run_rnn_test(
+            name=f"{name}_{seed}", seed=seed, verbose=verbose, model_file=model_file, feature_size=feature_size, hidden_size=hidden_size, num_layers=num_layers),
+        seed_start=seed_start, seed_end=seed_end
     )
 
 
