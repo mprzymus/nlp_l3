@@ -134,7 +134,7 @@ class RNNModel(LightningModel):
     def __init__(self, feature_size, hidden_size, num_layers=3, batch_first=True, learning_rate: float = 1e-3, loss_cls=nn.BCELoss):
         super().__init__(learning_rate, loss_cls)
         self.model = torch.nn.ModuleDict({
-            'lstm': nn.RNN(
+            'rnn': nn.RNN(
                 input_size=feature_size, hidden_size=hidden_size, num_layers=num_layers, batch_first=batch_first
             ),
             'linear': nn.Sequential(
