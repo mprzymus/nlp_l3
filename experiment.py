@@ -14,11 +14,46 @@ import torch
 from sentence_transformers import SentenceTransformer
 from torch import nn
 from torch.utils.data import DataLoader
-
 from config import ENGLISH_TEST, ENGLISH_TRAIN, PROBLEM_TEST, PROBLEM_TRAIN
-from data import HatefulTweets, TextDataset, WordDataset
-from nn import BinaryMLP, CNNModel, train_model
+from data import HatefulTweets, TextDataset, WordDataset, RnnDataset
+from nn import BinaryMLP, CNNModel, LSTMModel, RNNModel, train_model
 from text_processing import get_fasttext_embeddings
+
+def run_lstm_test(
+    model_file: Path,
+    name: str = "model",
+    seed: int = 42,
+    verbose: bool = True,
+    feature_size=300, hidden_size=150, num_layers=1
+) -> dict[str, float]:
+    pl.seed_everything(seed, workers=True)
+
+    datamodule = HatefulTweets(
+        model_file, 128, dataset_cls=RnnDataset
+    )
+    model = LSTMModel(feature_size=feature_size, hidden_size=hidden_size,
+                      num_layers=num_layers, learning_rate=1e-4)
+
+    best_log = train_model(model, datamodule, name=name,
+                           epochs=200, verbose=verbose)
+    return best_log
+
+def run_rnn_test(
+    datamodule: pl.LightningDataModule,
+    name: str = "model",
+    seed: int = 42,
+    verbose: bool = True,
+    feature_size=300, hidden_size=150, num_layers=1
+) -> dict[str, float]:
+    pl.seed_everything(seed, workers=True)
+
+    model = RNNModel(feature_size=feature_size, hidden_size=hidden_size,
+                      num_layers=num_layers, learning_rate=1e-4)
+
+    best_log = train_model(model, datamodule, name=name,
+                           epochs=200, verbose=verbose)
+    return best_log
+
 
 
 def run_mlp_test(
@@ -183,6 +218,55 @@ def run_repeated_mlp(
             seed=seed,
             verbose=verbose,
         )
+    )
+
+def run_repeated_lstm(
+    model_file: Path,
+    name: str = "lstm",
+    verbose: bool = False,
+    seed_start=1,
+    seed_end=11,
+    feature_size=300, hidden_size=150, num_layers=1,
+    train_path: Path = PROBLEM_TRAIN,
+    test_path: Path = PROBLEM_TEST,
+) -> dict[str, str]:
+    train_dataset = RnnDataset(train_path, model_file)
+    test_dataset = RnnDataset(test_path, model_file)
+
+    datamodule = HatefulTweets(train_dataset, test_dataset, 128)
+    return run_repeated(
+        lambda seed: run_lstm_test(
+            datamodule = datamodule,
+            name=f"{name}_{seed}", 
+            seed=seed, 
+            verbose=verbose,
+            feature_size=feature_size, hidden_size=hidden_size, num_layers=num_layers),
+        seed_start=seed_start, seed_end=seed_end
+    )
+
+
+def run_repeated_rnn(
+    model_file: Path,
+    name: str = "lstm",
+    verbose: bool = False,
+    seed_start=1,
+    seed_end=11,
+    feature_size=300, hidden_size=150, num_layers=1,
+    train_path: Path = PROBLEM_TRAIN,
+    test_path: Path = PROBLEM_TEST,
+) -> dict[str, str]:
+    train_dataset = RnnDataset(train_path, model_file)
+    test_dataset = RnnDataset(test_path, model_file)
+
+    datamodule = HatefulTweets(train_dataset, test_dataset, 128)
+    return run_repeated(
+        lambda seed: run_rnn_test(
+            datamodule = datamodule,
+            name=f"{name}_{seed}",
+            seed=seed,
+            verbose=verbose,
+            feature_size=feature_size, hidden_size=hidden_size, num_layers=num_layers),
+        seed_start=seed_start, seed_end=seed_end
     )
 
 

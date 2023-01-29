@@ -13,8 +13,8 @@ MODELS_DIR.mkdir(exist_ok=True)
 SG_FULL = MODELS_DIR / "sg_full.bin"
 SG_CORPUS = MODELS_DIR / "sg_corpus.bin"
 
-PROBLEM_TRAIN = OUTPUTS_DIR / "problem_train.csv"
-PROBLEM_TEST = OUTPUTS_DIR / "problem_test.csv"
+PROBLEM_TRAIN = DATA_DIR / "problem_train.csv"
+PROBLEM_TEST = DATA_DIR / "problem_test.csv"
 
 ENGLISH_TRAIN = OUTPUTS_DIR / "english_train.csv"
 ENGLISH_TEST = OUTPUTS_DIR / "english_test.csv"

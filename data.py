@@ -1,13 +1,18 @@
 import typing as t
 import warnings
 from pathlib import Path
-
+from contextlib import redirect_stderr
+import fasttext
+import os
 import pandas as pd
 import pytorch_lightning as pl
 import torch
-import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Dataset
+
+from config import PROBLEM_TEST, PROBLEM_TRAIN
+import torch.nn.functional as F
+
 
 warnings.filterwarnings("ignore", ".*does not have many workers.*")
 
@@ -62,11 +67,41 @@ class WordDataset(Dataset):
         return self.embeddings[idx], self.labels[idx]
 
 
+def sentence_to_tensor(text, model):
+    ls = []
+    for word in fasttext.tokenize(text):
+        ls.append(torch.from_numpy(model.get_word_vector(word)))
+    ls = torch.stack(ls)
+    return ls
+
+
+class RnnDataset(Dataset):
+    def __init__(self, csv_file: Path, embeddings_model: Path) -> None:
+        super().__init__()
+        df = pd.read_csv(csv_file)
+
+        with open(os.devnull, "w") as null:
+            with redirect_stderr(null):
+                model = fasttext.load_model(str(embeddings_model))
+
+        embeddings_list = [sentence_to_tensor(
+            text, model) for text in df["text"]]
+
+        self.embeddings = pad_sequence(embeddings_list, batch_first=True)
+        self.labels = torch.tensor(df["label"].values)
+
+    def __len__(self) -> int:
+        return len(self.labels)
+
+    def __getitem__(self, idx: int) -> t.Tuple[torch.Tensor, torch.Tensor]:
+        return self.embeddings[idx], self.labels[idx]
+
+
 class HatefulTweets(pl.LightningDataModule):
     def __init__(
         self,
-        train_dataset: TextDataset | WordDataset,
-        test_dataset: TextDataset | WordDataset,
+        train_dataset: TextDataset | WordDataset | RnnDataset,
+        test_dataset: TextDataset | WordDataset | RnnDataset,
         batch_size: int,
         num_workers: int = 0,
         pin_memory: bool = True,

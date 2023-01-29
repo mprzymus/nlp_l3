@@ -110,17 +110,44 @@ class BinaryMLP(LightningModel):
         return self.mlp(x).squeeze()
 
 
-class RNNModel(LightningModel):
-    def __init__(
-        self,
-        learning_rate: float = 1e-3,
-        loss_cls=nn.BCELoss,
-    ) -> None:
+class LSTMModel(LightningModel):
+    def __init__(self, feature_size, hidden_size, num_layers=3, batch_first=True, learning_rate: float = 1e-3, loss_cls=nn.BCELoss):
         super().__init__(learning_rate, loss_cls)
+        self.model = torch.nn.ModuleDict({
+            'lstm': torch.nn.LSTM(
+                input_size=feature_size, hidden_size=hidden_size, num_layers=num_layers, batch_first=batch_first
+            ),
+            'linear': nn.Sequential(
+                nn.Linear(in_features=hidden_size, out_features=1),
+                nn.Sigmoid()
+            )
+            
+        })
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        pass
+        _, hidden = self.model['lstm'](x)
+        linear_in = hidden[0][-1]
+        return self.model['linear'](linear_in).squeeze()
 
+
+class RNNModel(LightningModel):
+    def __init__(self, feature_size, hidden_size, num_layers=3, batch_first=True, learning_rate: float = 1e-3, loss_cls=nn.BCELoss):
+        super().__init__(learning_rate, loss_cls)
+        self.model = torch.nn.ModuleDict({
+            'lstm': nn.RNN(
+                input_size=feature_size, hidden_size=hidden_size, num_layers=num_layers, batch_first=batch_first
+            ),
+            'linear': nn.Sequential(
+                nn.Linear(in_features=hidden_size, out_features=1),
+                nn.Sigmoid()
+            )
+            
+        })
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        _, hidden = self.model['lstm'](x)
+        linear_in = hidden[-1]
+        return self.model['linear'](linear_in).squeeze()
 
 class CNNModel(LightningModel):
     def __init__(
