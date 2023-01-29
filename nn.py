@@ -194,7 +194,7 @@ class MetricTracker(Callback):
         self.best_epoch = {}
         self.best_loss = float("inf")
 
-    def on_validation_epoch_end(
+    def on_train_epoch_end(
         self,
         trainer: "pl.Trainer",
         module: "pl.LightningModule",
