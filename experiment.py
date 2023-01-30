@@ -23,7 +23,7 @@ from text_processing import get_fasttext_embeddings
 
 
 def run_lstm_test(
-    model_file: Path,
+    datamodule: pl.LightningDataModule,
     name: str = "model",
     seed: int = 42,
     verbose: bool = True,
@@ -32,16 +32,16 @@ def run_lstm_test(
     num_layers=1,
 ) -> dict[str, float]:
     pl.seed_everything(seed, workers=True)
-
-    datamodule = HatefulTweets(model_file, 128, dataset_cls=RnnDataset)
     model = LSTMModel(
         feature_size=feature_size,
         hidden_size=hidden_size,
         num_layers=num_layers,
         learning_rate=1e-4,
     )
-
+    start = time.perf_counter()
     best_log = train_model(model, datamodule, name=name, epochs=200, verbose=verbose)
+    end = time.perf_counter()
+    best_log["train_time"] = end - start
     return best_log
 
 
@@ -62,8 +62,11 @@ def run_rnn_test(
         num_layers=num_layers,
         learning_rate=1e-4,
     )
-
+    start = time.perf_counter()
     best_log = train_model(model, datamodule, name=name, epochs=200, verbose=verbose)
+    end = time.perf_counter()
+    best_log["train_time"] = end - start
+
     return best_log
 
 
@@ -265,7 +268,7 @@ def run_repeated_lstm(
 
 def run_repeated_rnn(
     model_file: Path,
-    name: str = "lstm",
+    name: str = "rnn",
     verbose: bool = False,
     seed_start=1,
     seed_end=11,
