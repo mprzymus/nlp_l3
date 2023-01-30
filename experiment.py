@@ -9,51 +9,62 @@ from pathlib import Path
 from statistics import mean, stdev
 
 import fasttext
+import pandas as pd
 import pytorch_lightning as pl
 import torch
 from sentence_transformers import SentenceTransformer
 from torch import nn
 from torch.utils.data import DataLoader
+
 from config import ENGLISH_TEST, ENGLISH_TRAIN, PROBLEM_TEST, PROBLEM_TRAIN
-from data import HatefulTweets, TextDataset, WordDataset, RnnDataset
+from data import HatefulTweets, RnnDataset, TextDataset, WordDataset
 from nn import BinaryMLP, CNNModel, LSTMModel, RNNModel, train_model
 from text_processing import get_fasttext_embeddings
+
 
 def run_lstm_test(
     model_file: Path,
     name: str = "model",
     seed: int = 42,
     verbose: bool = True,
-    feature_size=300, hidden_size=150, num_layers=1
+    feature_size=300,
+    hidden_size=150,
+    num_layers=1,
 ) -> dict[str, float]:
     pl.seed_everything(seed, workers=True)
 
-    datamodule = HatefulTweets(
-        model_file, 128, dataset_cls=RnnDataset
+    datamodule = HatefulTweets(model_file, 128, dataset_cls=RnnDataset)
+    model = LSTMModel(
+        feature_size=feature_size,
+        hidden_size=hidden_size,
+        num_layers=num_layers,
+        learning_rate=1e-4,
     )
-    model = LSTMModel(feature_size=feature_size, hidden_size=hidden_size,
-                      num_layers=num_layers, learning_rate=1e-4)
 
-    best_log = train_model(model, datamodule, name=name,
-                           epochs=200, verbose=verbose)
+    best_log = train_model(model, datamodule, name=name, epochs=200, verbose=verbose)
     return best_log
+
 
 def run_rnn_test(
     datamodule: pl.LightningDataModule,
     name: str = "model",
     seed: int = 42,
     verbose: bool = True,
-    feature_size=300, hidden_size=150, num_layers=1
+    feature_size=300,
+    hidden_size=150,
+    num_layers=1,
 ) -> dict[str, float]:
     pl.seed_everything(seed, workers=True)
 
-    model = RNNModel(feature_size=feature_size, hidden_size=hidden_size,
-                      num_layers=num_layers, learning_rate=1e-4)
+    model = RNNModel(
+        feature_size=feature_size,
+        hidden_size=hidden_size,
+        num_layers=num_layers,
+        learning_rate=1e-4,
+    )
 
-    best_log = train_model(model, datamodule, name=name,
-                           epochs=200, verbose=verbose)
+    best_log = train_model(model, datamodule, name=name, epochs=200, verbose=verbose)
     return best_log
-
 
 
 def run_mlp_test(
@@ -220,13 +231,16 @@ def run_repeated_mlp(
         )
     )
 
+
 def run_repeated_lstm(
     model_file: Path,
     name: str = "lstm",
     verbose: bool = False,
     seed_start=1,
     seed_end=11,
-    feature_size=300, hidden_size=150, num_layers=1,
+    feature_size=300,
+    hidden_size=150,
+    num_layers=1,
     train_path: Path = PROBLEM_TRAIN,
     test_path: Path = PROBLEM_TEST,
 ) -> dict[str, str]:
@@ -236,12 +250,16 @@ def run_repeated_lstm(
     datamodule = HatefulTweets(train_dataset, test_dataset, 128)
     return run_repeated(
         lambda seed: run_lstm_test(
-            datamodule = datamodule,
-            name=f"{name}_{seed}", 
-            seed=seed, 
+            datamodule=datamodule,
+            name=f"{name}_{seed}",
+            seed=seed,
             verbose=verbose,
-            feature_size=feature_size, hidden_size=hidden_size, num_layers=num_layers),
-        seed_start=seed_start, seed_end=seed_end
+            feature_size=feature_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+        ),
+        seed_start=seed_start,
+        seed_end=seed_end,
     )
 
 
@@ -251,7 +269,9 @@ def run_repeated_rnn(
     verbose: bool = False,
     seed_start=1,
     seed_end=11,
-    feature_size=300, hidden_size=150, num_layers=1,
+    feature_size=300,
+    hidden_size=150,
+    num_layers=1,
     train_path: Path = PROBLEM_TRAIN,
     test_path: Path = PROBLEM_TEST,
 ) -> dict[str, str]:
@@ -261,12 +281,16 @@ def run_repeated_rnn(
     datamodule = HatefulTweets(train_dataset, test_dataset, 128)
     return run_repeated(
         lambda seed: run_rnn_test(
-            datamodule = datamodule,
+            datamodule=datamodule,
             name=f"{name}_{seed}",
             seed=seed,
             verbose=verbose,
-            feature_size=feature_size, hidden_size=hidden_size, num_layers=num_layers),
-        seed_start=seed_start, seed_end=seed_end
+            feature_size=feature_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+        ),
+        seed_start=seed_start,
+        seed_end=seed_end,
     )
 
 
@@ -385,3 +409,99 @@ def calculate_memory_usage(model: nn.Module) -> str:
     mem = mem_params + mem_buffers
 
     return f"{mem / (1024**2):.3f} MB"
+
+
+def check_errors(
+    model: nn.Module,
+    data_file: Path,
+    data_loader: DataLoader,
+    use_sigmoid: bool = True,
+    example_num: int = 10,
+) -> None:
+    model.eval()
+
+    df = pd.read_csv(data_file)
+    true_list = []
+    pred_list = []
+
+    with torch.no_grad():
+        for x, y in data_loader:
+            x = x.cuda()
+
+            out = model(x).cpu()
+            if use_sigmoid:
+                out = torch.sigmoid(out)
+
+            true_list.append(y)
+            pred_list.append(out)
+
+    trues = torch.cat(true_list)
+    pred_probs = torch.cat(pred_list)
+    preds = (pred_probs > 0.5).long()
+
+    correct = trues == preds
+
+    print("Predicted correctly:", correct.sum().item())
+    print("Predicted incorrectly:", (~correct).sum().item())
+
+    invalid_df = df[(~correct).numpy()]
+    invalid_true = trues[~correct]
+    invalid_pred_probs = pred_probs[~correct]
+
+    print()
+    print("Non-hate tweets predicted as hate:", (invalid_true == 0).sum().item())
+    print("Most misclassified examples:")
+
+    example_probs = invalid_pred_probs[invalid_true == 0]
+    example_indices = example_probs.argsort(descending=True)[:example_num].numpy()
+    example_df = invalid_df[invalid_df["label"] == 0].reset_index(drop=True)
+    for idx in example_indices:
+        print(
+            "\tProb:",
+            f"{example_probs[idx]:.3f}",
+            "\tText:",
+            f"'{example_df['text'].iloc[idx]}'",
+        )
+
+    print()
+    print("Hate tweets predicted as non-hate:", (invalid_true == 1).sum().item())
+    print("Most misclassified examples:")
+
+    example_probs = invalid_pred_probs[invalid_true == 1]
+    example_indices = example_probs.argsort(descending=False)[:example_num].numpy()
+    example_df = invalid_df[invalid_df["label"] == 1].reset_index(drop=True)
+
+    for idx in example_indices:
+        print(
+            "\tProb:",
+            f"{example_probs[idx]:.3f}",
+            "\tText:",
+            f"'{example_df['text'].iloc[idx]}'",
+        )
+
+
+if __name__ == "__main__":
+    from config import CHECKPOINTS_DIR, PROBLEM_TEST, SG_CORPUS
+
+    embeddings_model = fasttext.load_model(str(SG_CORPUS))
+
+    dataset = WordDataset(PROBLEM_TEST, embeddings_model.get_word_vector, 32)
+    loader = DataLoader(
+        dataset,
+        batch_size=128,
+        pin_memory=True,
+        shuffle=False,
+        num_workers=0,
+    )
+
+    checkpoint_file = CHECKPOINTS_DIR / "cnn_corpus_1.ckpt"
+    model = CNNModel.load_from_checkpoint(
+        checkpoint_file,
+        conv_kernels=[3, 4, 5],
+        conv_filter=100,
+        head_dim=300,
+        sentence_length=32,
+        learning_rate=1e-5,
+    ).cuda()
+
+    check_errors(model, PROBLEM_TEST, loader)
