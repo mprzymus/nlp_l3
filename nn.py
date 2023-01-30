@@ -145,7 +145,7 @@ class RNNModel(LightningModel):
         })
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        _, hidden = self.model['lstm'](x)
+        _, hidden = self.model['rnn'](x)
         linear_in = hidden[-1]
         return self.model['linear'](linear_in).squeeze()
 
