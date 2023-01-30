@@ -478,30 +478,3 @@ def check_errors(
             "\tText:",
             f"'{example_df['text'].iloc[idx]}'",
         )
-
-
-if __name__ == "__main__":
-    from config import CHECKPOINTS_DIR, PROBLEM_TEST, SG_CORPUS
-
-    embeddings_model = fasttext.load_model(str(SG_CORPUS))
-
-    dataset = WordDataset(PROBLEM_TEST, embeddings_model.get_word_vector, 32)
-    loader = DataLoader(
-        dataset,
-        batch_size=128,
-        pin_memory=True,
-        shuffle=False,
-        num_workers=0,
-    )
-
-    checkpoint_file = CHECKPOINTS_DIR / "cnn_corpus_1.ckpt"
-    model = CNNModel.load_from_checkpoint(
-        checkpoint_file,
-        conv_kernels=[3, 4, 5],
-        conv_filter=100,
-        head_dim=300,
-        sentence_length=32,
-        learning_rate=1e-5,
-    ).cuda()
-
-    check_errors(model, PROBLEM_TEST, loader)
